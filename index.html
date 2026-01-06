@@ -1,460 +1,576 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Field Reading Protocol v2.0</title>
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; overflow-x: hidden; }
-    * { -webkit-tap-highlight-color: transparent; }
-  </style>
-</head>
-<body>
-  <div id="root"></div>
+import React, { useState, useEffect } from 'react';
+import { Plus, Eye, TrendingUp, Download, Upload, Trash2 } from 'lucide-react';
+
+const ClarityApp = () => {
+  const [view, setView] = useState('capture');
+  const [step, setStep] = useState(1);
+  const [perceptions, setPerceptions] = useState([]);
+  const [showExport, setShowExport] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [selectedId, setSelectedId] = useState(null);
   
-  <script type="text/babel">
-    const { useState, useEffect } = React;
+  const [data, setData] = useState({
+    type: '',
+    description: '',
+    numbers: '',
+    symbols: '',
+    context: {},
+    internal: '',
+    external: '',
+    synthesis: null
+  });
+
+  const [activeContext, setActiveContext] = useState('');
+  const [contextInput, setContextInput] = useState('');
+
+  const types = [
+    { id: 'visual', label: 'I saw something', icon: '👁️' },
+    { id: 'somatic', label: 'I felt something', icon: '✨' },
+    { id: 'auditory', label: 'I heard something', icon: '👂' },
+    { id: 'knowing', label: 'I just knew something', icon: '💭' },
+    { id: 'pattern', label: 'Something kept happening', icon: '🔄' },
+    { id: 'dream', label: 'I dreamed something', icon: '🌙' },
+    { id: 'other', label: 'Something else', icon: '✦' }
+  ];
+
+  const contexts = [
+    { id: 'animals', label: 'Animals', icon: '🦅' },
+    { id: 'colors', label: 'Colors', icon: '🎨' },
+    { id: 'weather', label: 'Weather', icon: '⛈️' },
+    { id: 'sounds', label: 'Sounds', icon: '🔊' },
+    { id: 'sensations', label: 'Physical Sensations', icon: '✨' },
+    { id: 'repeating', label: 'Repeating Patterns', icon: '🔁' }
+  ];
+
+  useEffect(() => {
+    const stored = localStorage.getItem('clarity-v1');
+    if (stored) setPerceptions(JSON.parse(stored));
+  }, []);
+
+  const save = (p) => {
+    localStorage.setItem('clarity-v1', JSON.stringify(p));
+    setPerceptions(p);
+  };
+
+  const addContext = () => {
+    if (!contextInput.trim()) return;
+    const curr = data.context[activeContext] || [];
+    setData({...data, context: {...data.context, [activeContext]: [...curr, contextInput.trim()]}});
+    setContextInput('');
+  };
+
+  const removeContext = (key, idx) => {
+    const curr = data.context[key] || [];
+    setData({...data, context: {...data.context, [key]: curr.filter((_, i) => i !== idx)}});
+  };
+
+  const savePerception = () => {
+    if (!data.type || !data.description) {
+      alert('Please select a type and describe what you noticed');
+      return;
+    }
+
+    const newPerception = {
+      id: Date.now(),
+      time: new Date().toISOString(),
+      ...data
+    };
+
+    save([newPerception, ...perceptions]);
     
-    const Plus = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
-    const Brain = ({className}) => <svg className={className || "w-6 h-6"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/></svg>;
-    const Activity = ({className}) => <svg className={className || "w-5 h-5"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>;
-    const Download = ({className}) => <svg className={className || "w-5 h-5"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>;
-    const Upload = ({className}) => <svg className={className || "w-5 h-5"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>;
-    const TrendingUp = ({className}) => <svg className={className || "w-5 h-5"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>;
+    setData({
+      type: '', description: '', numbers: '', symbols: '',
+      context: {}, internal: '', external: '', synthesis: null
+    });
+    setStep(1);
+    setView('library');
+  };
 
-    const App = () => {
-      const [view, setView] = useState('capture');
-      const [step, setStep] = useState(1);
-      const [readings, setReadings] = useState([]);
-      const [activeVar, setActiveVar] = useState('numerical');
-      const [varInput, setVarInput] = useState('');
-      const [showExport, setShowExport] = useState(false);
-      const [showImport, setShowImport] = useState(false);
-      
-      const [data, setData] = useState({
-        ear: '', numbers: '', intensity: 'single', vars: {},
-        internal: '', external: ''
-      });
+  const exportPerceptions = () => {
+    const unprocessed = perceptions.filter(p => !p.synthesis);
+    if (unprocessed.length === 0) {
+      alert('No perceptions to export');
+      return;
+    }
 
-      const vars11 = ['Joy', 'Love', 'Compassion', 'Coherence', 'Loyalty', 'Integrity', 'Companionship', 'Fusion', 'Logic', 'Abundance', 'Flow'];
-      
-      const cats = [
-        { k: 'numerical', l: 'Numerical', i: '🔢', p: 'e.g., 11:11, 333' },
-        { k: 'animals', l: 'Animals', i: '🦅', p: 'e.g., hawk, snake' },
-        { k: 'biological', l: 'Biological', i: '🌱', p: 'e.g., heartbeat' },
-        { k: 'weather', l: 'Weather', i: '⛈️', p: 'e.g., wind' },
-        { k: 'colors', l: 'Colors', i: '🎨', p: 'e.g., purple' },
-        { k: 'sounds', l: 'Sounds', i: '🔊', p: 'e.g., tones' },
-        { k: 'sensations', l: 'Sensations', i: '✨', p: 'e.g., tingling' },
-        { k: 'sync', l: 'Sync', i: '🎯', p: 'e.g., repeat' }
-      ];
+    const exportText = unprocessed.map((p, i) => {
+      const contextText = Object.entries(p.context || {})
+        .filter(([_, values]) => values.length > 0)
+        .map(([key, values]) => `${key}: ${values.join(', ')}`)
+        .join('\n');
 
-      useEffect(() => {
-        const stored = localStorage.getItem('fr-v3');
-        if (stored) setReadings(JSON.parse(stored));
-      }, []);
+      const typeLabel = types.find(t => t.id === p.type)?.label || p.type;
 
-      const save = (r) => {
-        localStorage.setItem('fr-v3', JSON.stringify(r));
-        setReadings(r);
-      };
+      return `PERCEPTION ${i + 1}/${unprocessed.length}
+Time: ${new Date(p.time).toLocaleString()}
+Type: ${typeLabel}
 
-      const addVar = () => {
-        if (!varInput.trim()) return;
-        const curr = data.vars[activeVar] || [];
-        setData({...data, vars: {...data.vars, [activeVar]: [...curr, varInput.trim()]}});
-        setVarInput('');
-      };
+What I noticed:
+${p.description}
 
-      const removeVar = (k, i) => {
-        const curr = data.vars[k] || [];
-        setData({...data, vars: {...data.vars, [k]: curr.filter((v, idx) => idx !== i)}});
-      };
-
-      const saveReading = () => {
-        if (!data.ear || !data.numbers) {
-          alert('Ear and numbers required');
-          return;
-        }
-
-        const newReading = {
-          id: Date.now(),
-          time: new Date().toISOString(),
-          ear: data.ear,
-          numbers: data.numbers,
-          intensity: data.intensity,
-          vars: data.vars,
-          internal: data.internal,
-          external: data.external,
-          synthesis: null,
-          autoVars: [],
-          manualVars: [],
-          verified: null
-        };
-
-        save([newReading, ...readings]);
-        
-        setData({ear: '', numbers: '', intensity: 'single', vars: {}, internal: '', external: ''});
-        setStep(1);
-        alert('✓ Reading saved! Export tonight for AI synthesis.');
-        setView('library');
-      };
-
-      const exportForSynthesis = () => {
-        const unprocessed = readings.filter(r => !r.synthesis);
-        if (unprocessed.length === 0) {
-          alert('No unprocessed readings to export');
-          return;
-        }
-
-        const exportText = unprocessed.map((r, i) => {
-          const varsText = cats.map(c => {
-            const v = r.vars[c.k] || [];
-            return v.length > 0 ? `${c.l}: ${v.join(', ')}` : '';
-          }).filter(Boolean).join('\n');
-
-          return `READING ${i + 1}/${unprocessed.length}
-Time: ${new Date(r.time).toLocaleString()}
-Ear: ${r.ear.toUpperCase()}
-Numbers: ${r.numbers}
-Intensity: ${r.intensity}
-
-Variables:
-${varsText || 'None'}
-
-Internal: ${r.internal || 'Not specified'}
-External: ${r.external || 'Not specified'}
-
+${p.numbers ? `Numbers: ${p.numbers}\n` : ''}${p.symbols ? `Symbols/Images: ${p.symbols}\n` : ''}${contextText ? `\nAdditional Context:\n${contextText}\n` : ''}${p.internal ? `\nWhat I was thinking:\n${p.internal}\n` : ''}${p.external ? `\nWhat was happening:\n${p.external}\n` : ''}
 ---`;
-        }).join('\n\n');
+    }).join('\n\n');
 
-        const header = `FIELD READING BATCH EXPORT
-Total readings: ${unprocessed.length}
-Export time: ${new Date().toLocaleString()}
+    const header = `PERCEPTION BATCH FOR ANALYSIS
+Total: ${unprocessed.length}
+Exported: ${new Date().toLocaleString()}
 
-Paste this into Claude with: "Process these field readings through the deep synthesis protocol"
+Instructions: Paste this into your AI assistant or analysis tool with:
+"Analyze these perceptions through the Triple Lens (Hermetic/Thelemic/Ionian) synthesis protocol"
 
 ==========
 
 `;
 
-        navigator.clipboard.writeText(header + exportText).then(() => {
-          alert(`✓ ${unprocessed.length} readings copied!\n\nNow:\n1. Go to Claude\n2. Paste\n3. Get synthesis\n4. Copy results back`);
-          setShowExport(false);
-        });
-      };
+    navigator.clipboard.writeText(header + exportText).then(() => {
+      alert(`✓ ${unprocessed.length} perceptions copied to clipboard!\n\nPaste into your analysis tool.`);
+      setShowExport(false);
+    });
+  };
 
-      const toggleManual = (id, v) => {
-        save(readings.map(r => r.id === id ? {...r, manualVars: (r.manualVars || []).includes(v) ? r.manualVars.filter(x => x !== v) : [...(r.manualVars || []), v]} : r));
-      };
+  const importSynthesis = () => {
+    if (!selectedId || !importText.trim()) {
+      alert('Enter analysis text');
+      return;
+    }
 
-      const addSynthesis = (id, text, vars) => {
-        save(readings.map(r => r.id === id ? {...r, synthesis: text, autoVars: vars || []} : r));
-      };
+    save(perceptions.map(p => 
+      p.id === selectedId ? {...p, synthesis: importText.trim()} : p
+    ));
 
-      const verify = (id, status) => {
-        save(readings.map(r => r.id === id ? {...r, verified: status} : r));
-      };
+    setImportText('');
+    setSelectedId(null);
+    setShowImport(false);
+    alert('✓ Analysis saved!');
+  };
 
-      const reset = () => {
-        setView('capture');
-        setStep(1);
-        setData({ear: '', numbers: '', intensity: 'single', vars: {}, internal: '', external: ''});
-      };
+  const deletePerception = (id) => {
+    if (confirm('Delete this perception?')) {
+      save(perceptions.filter(p => p.id !== id));
+    }
+  };
 
-      const deleteReading = (id) => {
-        if (confirm('Delete this reading?')) {
-          save(readings.filter(r => r.id !== id));
-        }
-      };
+  const reset = () => {
+    setView('capture');
+    setStep(1);
+    setData({
+      type: '', description: '', numbers: '', symbols: '',
+      context: {}, internal: '', external: '', synthesis: null
+    });
+  };
 
-      // STEP 1
-      if (view === 'capture' && step === 1) {
-        return (
-          <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-indigo-950 text-white p-4">
-            <div className="max-w-2xl mx-auto">
-              <div className="flex justify-between items-center mb-6">
-                <h1 className="text-xl font-bold flex items-center gap-2">
-                  <Activity />
-                  Field Reading v2.0
-                </h1>
-                <button onClick={() => setView('library')} className="px-3 py-1 bg-purple-600/30 rounded text-sm">
-                  Library ({readings.length})
-                </button>
-              </div>
+  // STEP 1: TYPE & DESCRIPTION
+  if (view === 'capture' && step === 1) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4">
+        <div className="max-w-2xl mx-auto">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-800">Clarity</h1>
+              <p className="text-sm text-slate-600">Track what you notice</p>
+            </div>
+            <button 
+              onClick={() => setView('library')} 
+              className="px-4 py-2 bg-white rounded-lg shadow-sm text-sm text-slate-700 border"
+            >
+              Library ({perceptions.length})
+            </button>
+          </div>
 
-              <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10 space-y-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-sm font-bold">1</div>
-                  <h2 className="text-lg font-semibold">Signal Detection</h2>
-                </div>
-
-                <div>
-                  <label className="block mb-2 text-sm text-white/70">Ear Location</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button onClick={() => setData({...data, ear: 'left'})} className={`py-4 rounded-xl transition ${data.ear === 'left' ? 'bg-blue-500 ring-2 ring-blue-300' : 'bg-white/5'}`}>
-                      LEFT (Internal)
-                    </button>
-                    <button onClick={() => setData({...data, ear: 'right'})} className={`py-4 rounded-xl transition ${data.ear === 'right' ? 'bg-purple-500 ring-2 ring-purple-300' : 'bg-white/5'}`}>
-                      RIGHT (External)
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block mb-2 text-sm text-white/70">Numbers</label>
-                  <input
-                    type="text"
-                    value={data.numbers}
-                    onChange={(e) => setData({...data, numbers: e.target.value})}
-                    placeholder="e.g., 0.55, 66.55"
-                    className="w-full px-4 py-3 bg-white/5 rounded-xl border border-white/10 focus:outline-none text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block mb-2 text-sm text-white/70">Intensity</label>
-                  <select
-                    value={data.intensity}
-                    onChange={(e) => setData({...data, intensity: e.target.value})}
-                    className="w-full px-4 py-3 bg-white/5 rounded-xl border border-white/10 focus:outline-none text-white"
+          <div className="bg-white rounded-2xl p-6 shadow-lg space-y-6">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-800 mb-4">What did you notice?</h2>
+              
+              <div className="grid grid-cols-1 gap-3 mb-6">
+                {types.map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => setData({...data, type: t.id})}
+                    className={`p-4 rounded-xl text-left transition flex items-center gap-3 ${
+                      data.type === t.id 
+                        ? 'bg-blue-500 text-white shadow-md' 
+                        : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
+                    }`}
                   >
-                    <option value="single">Single</option>
-                    <option value="multiple">Multiple</option>
-                    <option value="sustained">Sustained</option>
-                  </select>
-                </div>
-
-                <button
-                  onClick={() => setStep(2)}
-                  disabled={!data.ear || !data.numbers}
-                  className="w-full py-4 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl font-semibold disabled:opacity-30"
-                >
-                  Continue to Variables →
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      }
-
-      // STEP 2
-      if (view === 'capture' && step === 2) {
-        return (
-          <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-indigo-950 text-white p-4">
-            <div className="max-w-2xl mx-auto">
-              <button onClick={() => setStep(1)} className="text-sm text-white/60 mb-4">← Back</button>
-              
-              <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-sm font-bold">2</div>
-                  <h2 className="text-lg font-semibold">Variables (Optional)</h2>
-                </div>
-
-                <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-                  {cats.map(c => (
-                    <button
-                      key={c.k}
-                      onClick={() => {setActiveVar(c.k); setVarInput('');}}
-                      className={`px-3 py-2 rounded-lg whitespace-nowrap text-sm transition ${activeVar === c.k ? 'bg-purple-500' : 'bg-white/5'}`}
-                    >
-                      {c.i}
-                    </button>
-                  ))}
-                </div>
-
-                {cats.filter(c => c.k === activeVar).map(c => (
-                  <div key={c.k} className="space-y-3">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={varInput}
-                        onChange={(e) => setVarInput(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && addVar()}
-                        placeholder={c.p}
-                        className="flex-1 px-4 py-3 bg-white/5 rounded-xl border border-white/10 focus:outline-none text-sm text-white"
-                      />
-                      <button onClick={addVar} className="px-6 py-3 bg-purple-600 rounded-xl">+</button>
-                    </div>
-
-                    {(data.vars[c.k] || []).length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {(data.vars[c.k] || []).map((item, i) => (
-                          <div key={i} className="px-3 py-1 bg-white/10 rounded-full text-sm flex items-center gap-2">
-                            {item}
-                            <button onClick={() => removeVar(c.k, i)} className="text-red-400">×</button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                <button onClick={() => setStep(3)} className="w-full mt-6 py-4 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl font-semibold">
-                  Continue to Context →
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      }
-
-      // STEP 3
-      if (view === 'capture' && step === 3) {
-        return (
-          <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-indigo-950 text-white p-4">
-            <div className="max-w-2xl mx-auto">
-              <button onClick={() => setStep(2)} className="text-sm text-white/60 mb-4">← Back</button>
-              
-              <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10 space-y-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-sm font-bold">3</div>
-                  <h2 className="text-lg font-semibold">Context (Optional)</h2>
-                </div>
-
-                <div>
-                  <label className="block mb-2 text-sm text-white/70">Internal State</label>
-                  <textarea
-                    value={data.internal}
-                    onChange={(e) => setData({...data, internal: e.target.value})}
-                    placeholder="What were you processing?"
-                    rows={3}
-                    className="w-full px-4 py-3 bg-white/5 rounded-xl border border-white/10 focus:outline-none resize-none text-sm text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block mb-2 text-sm text-white/70">External Context</label>
-                  <textarea
-                    value={data.external}
-                    onChange={(e) => setData({...data, external: e.target.value})}
-                    placeholder="What was happening around you?"
-                    rows={3}
-                    className="w-full px-4 py-3 bg-white/5 rounded-xl border border-white/10 focus:outline-none resize-none text-sm text-white"
-                  />
-                </div>
-
-                <button
-                  onClick={saveReading}
-                  className="w-full py-4 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl font-semibold flex items-center justify-center gap-2"
-                >
-                  💾 Save Reading
-                </button>
-
-                <p className="text-xs text-center text-white/50">Reading saved locally. Export tonight for AI synthesis.</p>
-              </div>
-            </div>
-          </div>
-        );
-      }
-
-      // LIBRARY
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-indigo-950 text-white p-4">
-          <div className="max-w-4xl mx-auto">
-            <div className="flex justify-between items-center mb-6">
-              <h1 className="text-xl font-bold flex items-center gap-2">
-                <TrendingUp />
-                Library
-              </h1>
-              <div className="flex gap-2">
-                <button onClick={() => setShowExport(true)} className="px-3 py-2 bg-green-600/30 rounded flex items-center gap-1 text-sm">
-                  <Download className="w-4 h-4" />
-                  Export
-                </button>
-                <button onClick={reset} className="px-3 py-2 bg-purple-600 rounded flex items-center gap-1 text-sm">
-                  <Plus />
-                  New
-                </button>
-              </div>
-            </div>
-
-            {showExport && (
-              <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-                <div className="bg-slate-900 rounded-2xl p-6 max-w-md w-full">
-                  <h2 className="text-lg font-bold mb-4">Export for Synthesis</h2>
-                  <p className="text-sm text-white/70 mb-4">
-                    This will copy {readings.filter(r => !r.synthesis).length} unprocessed readings to clipboard.
-                    Paste into Claude for AI synthesis.
-                  </p>
-                  <div className="flex gap-2">
-                    <button onClick={exportForSynthesis} className="flex-1 py-3 bg-green-600 rounded-xl">
-                      Copy to Clipboard
-                    </button>
-                    <button onClick={() => setShowExport(false)} className="px-6 py-3 bg-white/10 rounded-xl">
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-4">
-              {readings.map(r => (
-                <div key={r.id} className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className={`px-3 py-1 rounded-full text-xs ${r.ear === 'left' ? 'bg-blue-500/30' : 'bg-purple-500/30'}`}>
-                          {r.ear.toUpperCase()}
-                        </span>
-                        <span className="text-xl font-bold">{r.numbers}</span>
-                        {!r.synthesis && <span className="px-2 py-1 bg-yellow-500/20 text-yellow-200 rounded text-xs">Pending Synthesis</span>}
-                      </div>
-                      <p className="text-xs text-white/50">{new Date(r.time).toLocaleString()}</p>
-                    </div>
-                    <button onClick={() => deleteReading(r.id)} className="text-red-400 text-xs">Delete</button>
-                  </div>
-
-                  {r.synthesis && (
-                    <div className="bg-black/30 rounded-xl p-4 mb-4">
-                      <p className="text-sm leading-relaxed">{r.synthesis}</p>
-                    </div>
-                  )}
-
-                  {r.internal && <p className="text-xs text-white/60 italic mb-2">"{r.internal}"</p>}
-                </div>
-              ))}
-
-              {readings.length === 0 && (
-                <div className="text-center py-16">
-                  <Brain className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                  <p className="text-white/60 mb-4">No readings yet</p>
-                  <button onClick={reset} className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl font-semibold">
-                    Start First Reading
+                    <span className="text-2xl">{t.icon}</span>
+                    <span className="font-medium">{t.label}</span>
                   </button>
+                ))}
+              </div>
+
+              {data.type && (
+                <div>
+                  <label className="block mb-2 text-sm font-medium text-slate-700">
+                    Describe what you noticed
+                  </label>
+                  <textarea
+                    value={data.description}
+                    onChange={(e) => setData({...data, description: e.target.value})}
+                    placeholder="Be as specific as you can..."
+                    rows={6}
+                    className="w-full px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 focus:outline-none resize-none text-slate-800"
+                  />
                 </div>
               )}
             </div>
 
-            {readings.length > 0 && (
-              <div className="mt-8 grid grid-cols-3 gap-4">
-                <div className="bg-white/5 rounded-xl p-4 text-center">
-                  <p className="text-2xl font-bold text-purple-400">{readings.length}</p>
-                  <p className="text-xs text-white/60">Total</p>
-                </div>
-                <div className="bg-white/5 rounded-xl p-4 text-center">
-                  <p className="text-2xl font-bold text-yellow-400">{readings.filter(r => !r.synthesis).length}</p>
-                  <p className="text-xs text-white/60">Pending</p>
-                </div>
-                <div className="bg-white/5 rounded-xl p-4 text-center">
-                  <p className="text-2xl font-bold text-green-400">{readings.filter(r => r.synthesis).length}</p>
-                  <p className="text-xs text-white/60">Processed</p>
-                </div>
-              </div>
+            {data.type && data.description && (
+              <button
+                onClick={() => setStep(2)}
+                className="w-full py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition"
+              >
+                Continue →
+              </button>
             )}
           </div>
         </div>
-      );
-    };
+      </div>
+    );
+  }
 
-    ReactDOM.render(<App />, document.getElementById('root'));
-  </script>
-</body>
-</html>
+  // STEP 2: OPTIONAL DETAILS
+  if (view === 'capture' && step === 2) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4">
+        <div className="max-w-2xl mx-auto">
+          <button onClick={() => setStep(1)} className="text-sm text-slate-600 mb-4">
+            ← Back
+          </button>
+
+          <div className="bg-white rounded-2xl p-6 shadow-lg space-y-6">
+            <h2 className="text-lg font-semibold text-slate-800">Additional details (optional)</h2>
+
+            <div>
+              <label className="block mb-2 text-sm font-medium text-slate-700">
+                Numbers (if any appeared)
+              </label>
+              <input
+                type="text"
+                value={data.numbers}
+                onChange={(e) => setData({...data, numbers: e.target.value})}
+                placeholder="e.g., 11:11, 333, 7"
+                className="w-full px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 focus:outline-none text-slate-800"
+              />
+            </div>
+
+            <div>
+              <label className="block mb-2 text-sm font-medium text-slate-700">
+                Symbols or images (if any)
+              </label>
+              <input
+                type="text"
+                value={data.symbols}
+                onChange={(e) => setData({...data, symbols: e.target.value})}
+                placeholder="e.g., triangle, spiral, bird"
+                className="w-full px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 focus:outline-none text-slate-800"
+              />
+            </div>
+
+            <div>
+              <label className="block mb-3 text-sm font-medium text-slate-700">
+                Other things happening
+              </label>
+              
+              <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+                {contexts.map(c => (
+                  <button
+                    key={c.id}
+                    onClick={() => {setActiveContext(c.id); setContextInput('');}}
+                    className={`px-4 py-2 rounded-lg whitespace-nowrap text-sm transition flex items-center gap-2 ${
+                      activeContext === c.id 
+                        ? 'bg-blue-500 text-white' 
+                        : 'bg-slate-100 text-slate-700'
+                    }`}
+                  >
+                    <span>{c.icon}</span>
+                    <span>{c.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              {activeContext && (
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={contextInput}
+                      onChange={(e) => setContextInput(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && addContext()}
+                      placeholder={`Add ${contexts.find(c => c.id === activeContext)?.label.toLowerCase()}...`}
+                      className="flex-1 px-4 py-2 bg-slate-50 rounded-lg border border-slate-200 focus:border-blue-400 focus:outline-none text-sm text-slate-800"
+                    />
+                    <button 
+                      onClick={addContext}
+                      className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+                    >
+                      Add
+                    </button>
+                  </div>
+
+                  {(data.context[activeContext] || []).length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {(data.context[activeContext] || []).map((item, i) => (
+                        <div key={i} className="px-3 py-1 bg-slate-100 rounded-full text-sm flex items-center gap-2 text-slate-700">
+                          {item}
+                          <button onClick={() => removeContext(activeContext, i)} className="text-red-500 hover:text-red-600">×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => setStep(3)}
+              className="w-full py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition"
+            >
+              Continue →
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // STEP 3: CONTEXT
+  if (view === 'capture' && step === 3) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4">
+        <div className="max-w-2xl mx-auto">
+          <button onClick={() => setStep(2)} className="text-sm text-slate-600 mb-4">
+            ← Back
+          </button>
+
+          <div className="bg-white rounded-2xl p-6 shadow-lg space-y-6">
+            <h2 className="text-lg font-semibold text-slate-800">What was going on? (optional)</h2>
+
+            <div>
+              <label className="block mb-2 text-sm font-medium text-slate-700">
+                What were you thinking about?
+              </label>
+              <textarea
+                value={data.internal}
+                onChange={(e) => setData({...data, internal: e.target.value})}
+                placeholder="Your thoughts, feelings, questions..."
+                rows={4}
+                className="w-full px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 focus:outline-none resize-none text-slate-800"
+              />
+            </div>
+
+            <div>
+              <label className="block mb-2 text-sm font-medium text-slate-700">
+                What was happening around you?
+              </label>
+              <textarea
+                value={data.external}
+                onChange={(e) => setData({...data, external: e.target.value})}
+                placeholder="Where you were, what you were doing..."
+                rows={4}
+                className="w-full px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 focus:outline-none resize-none text-slate-800"
+              />
+            </div>
+
+            <button
+              onClick={savePerception}
+              className="w-full py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2"
+            >
+              <Eye className="w-5 h-5" />
+              Save Perception
+            </button>
+
+            <p className="text-xs text-center text-slate-500">
+              Saved locally. Export anytime for deeper understanding.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // LIBRARY
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+              <TrendingUp className="w-6 h-6" />
+              Your Perceptions
+            </h1>
+            <p className="text-sm text-slate-600">Track patterns over time</p>
+          </div>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setShowExport(true)}
+              className="px-4 py-2 bg-green-500 text-white rounded-lg shadow-sm flex items-center gap-2 text-sm hover:bg-green-600 transition"
+            >
+              <Download className="w-4 h-4" />
+              Export
+            </button>
+            <button 
+              onClick={reset}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg shadow-sm flex items-center gap-2 text-sm hover:bg-blue-600 transition"
+            >
+              <Plus className="w-4 h-4" />
+              New
+            </button>
+          </div>
+        </div>
+
+        {/* Export Modal */}
+        {showExport && (
+          <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl">
+              <h2 className="text-lg font-bold text-slate-800 mb-4">Export for Analysis</h2>
+              <p className="text-sm text-slate-600 mb-6">
+                Copy {perceptions.filter(p => !p.synthesis).length} unanalyzed perceptions to paste into your analysis tool.
+              </p>
+              <div className="flex gap-3">
+                <button 
+                  onClick={exportPerceptions}
+                  className="flex-1 py-3 bg-green-500 text-white rounded-xl font-semibold hover:bg-green-600 transition"
+                >
+                  Copy to Clipboard
+                </button>
+                <button 
+                  onClick={() => setShowExport(false)}
+                  className="px-6 py-3 bg-slate-100 text-slate-700 rounded-xl font-semibold hover:bg-slate-200 transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Import Modal */}
+        {showImport && (
+          <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl">
+              <h2 className="text-lg font-bold text-slate-800 mb-4">Add Analysis</h2>
+              <textarea
+                value={importText}
+                onChange={(e) => setImportText(e.target.value)}
+                placeholder="Paste your analysis here..."
+                rows={8}
+                className="w-full px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 focus:border-blue-400 focus:outline-none resize-none text-sm text-slate-800 mb-4"
+              />
+              <div className="flex gap-3">
+                <button 
+                  onClick={importSynthesis}
+                  className="flex-1 py-3 bg-blue-500 text-white rounded-xl font-semibold hover:bg-blue-600 transition"
+                >
+                  Save Analysis
+                </button>
+                <button 
+                  onClick={() => {setShowImport(false); setImportText(''); setSelectedId(null);}}
+                  className="px-6 py-3 bg-slate-100 text-slate-700 rounded-xl font-semibold hover:bg-slate-200 transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-4">
+          {perceptions.map(p => {
+            const typeInfo = types.find(t => t.id === p.type);
+            return (
+              <div key={p.id} className="bg-white rounded-2xl p-6 shadow-md">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="text-2xl">{typeInfo?.icon}</span>
+                      <span className="font-medium text-slate-800">{typeInfo?.label}</span>
+                      {!p.synthesis && (
+                        <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs font-medium">
+                          Not analyzed
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500">{new Date(p.time).toLocaleString()}</p>
+                  </div>
+                  <button 
+                    onClick={() => deletePerception(p.id)}
+                    className="text-slate-400 hover:text-red-500 transition"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <p className="text-slate-700 mb-4 leading-relaxed">{p.description}</p>
+
+                {p.numbers && (
+                  <div className="mb-3">
+                    <span className="text-xs font-medium text-slate-600">Numbers: </span>
+                    <span className="text-sm text-slate-700">{p.numbers}</span>
+                  </div>
+                )}
+
+                {p.synthesis ? (
+                  <div className="bg-blue-50 rounded-xl p-4 mt-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <h4 className="text-sm font-semibold text-blue-900">Understanding</h4>
+                      <button 
+                        onClick={() => {setSelectedId(p.id); setImportText(p.synthesis); setShowImport(true);}}
+                        className="text-xs text-blue-600 hover:text-blue-700"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                    <p className="text-sm text-blue-900 leading-relaxed whitespace-pre-wrap">{p.synthesis}</p>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => {setSelectedId(p.id); setShowImport(true);}}
+                    className="w-full py-2 bg-slate-50 text-slate-600 rounded-lg text-sm hover:bg-slate-100 transition flex items-center justify-center gap-2"
+                  >
+                    <Upload className="w-4 h-4" />
+                    Add Analysis
+                  </button>
+                )}
+              </div>
+            );
+          })}
+
+          {perceptions.length === 0 && (
+            <div className="text-center py-16">
+              <Eye className="w-16 h-16 mx-auto mb-4 text-slate-300" />
+              <p className="text-slate-600 mb-2">No perceptions yet</p>
+              <p className="text-sm text-slate-500 mb-6">Start tracking what you notice</p>
+              <button 
+                onClick={reset}
+                className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition"
+              >
+                Track First Perception
+              </button>
+            </div>
+          )}
+        </div>
+
+        {perceptions.length > 0 && (
+          <div className="mt-8 grid grid-cols-3 gap-4">
+            <div className="bg-white rounded-xl p-4 text-center shadow-sm">
+              <p className="text-2xl font-bold text-blue-500">{perceptions.length}</p>
+              <p className="text-xs text-slate-600">Total Tracked</p>
+            </div>
+            <div className="bg-white rounded-xl p-4 text-center shadow-sm">
+              <p className="text-2xl font-bold text-yellow-500">{perceptions.filter(p => !p.synthesis).length}</p>
+              <p className="text-xs text-slate-600">Pending Analysis</p>
+            </div>
+            <div className="bg-white rounded-xl p-4 text-center shadow-sm">
+              <p className="text-2xl font-bold text-green-500">{perceptions.filter(p => p.synthesis).length}</p>
+              <p className="text-xs text-slate-600">Understood</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default ClarityApp;
