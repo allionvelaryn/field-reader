@@ -24,18 +24,18 @@
     const Plus = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
     const Brain = ({className}) => <svg className={className || "w-6 h-6"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/></svg>;
     const Activity = ({className}) => <svg className={className || "w-5 h-5"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>;
-    const Layers = ({className}) => <svg className={className || "w-5 h-5"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg>;
-    const Eye = ({className}) => <svg className={className || "w-5 h-5"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>;
-    const Sparkles = ({className}) => <svg className={className || "w-5 h-5"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>;
+    const Download = ({className}) => <svg className={className || "w-5 h-5"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>;
+    const Upload = ({className}) => <svg className={className || "w-5 h-5"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>;
     const TrendingUp = ({className}) => <svg className={className || "w-5 h-5"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>;
 
     const App = () => {
       const [view, setView] = useState('capture');
       const [step, setStep] = useState(1);
       const [readings, setReadings] = useState([]);
-      const [processing, setProcessing] = useState(false);
       const [activeVar, setActiveVar] = useState('numerical');
       const [varInput, setVarInput] = useState('');
+      const [showExport, setShowExport] = useState(false);
+      const [showImport, setShowImport] = useState(false);
       
       const [data, setData] = useState({
         ear: '', numbers: '', intensity: 'single', vars: {},
@@ -77,94 +77,85 @@
         setData({...data, vars: {...data.vars, [k]: curr.filter((v, idx) => idx !== i)}});
       };
 
-      const submit = async () => {
+      const saveReading = () => {
         if (!data.ear || !data.numbers) {
           alert('Ear and numbers required');
           return;
         }
 
-        setProcessing(true);
+        const newReading = {
+          id: Date.now(),
+          time: new Date().toISOString(),
+          ear: data.ear,
+          numbers: data.numbers,
+          intensity: data.intensity,
+          vars: data.vars,
+          internal: data.internal,
+          external: data.external,
+          synthesis: null,
+          autoVars: [],
+          manualVars: [],
+          verified: null
+        };
+
+        save([newReading, ...readings]);
         
-        try {
+        setData({ear: '', numbers: '', intensity: 'single', vars: {}, internal: '', external: ''});
+        setStep(1);
+        alert('✓ Reading saved! Export tonight for AI synthesis.');
+        setView('library');
+      };
+
+      const exportForSynthesis = () => {
+        const unprocessed = readings.filter(r => !r.synthesis);
+        if (unprocessed.length === 0) {
+          alert('No unprocessed readings to export');
+          return;
+        }
+
+        const exportText = unprocessed.map((r, i) => {
           const varsText = cats.map(c => {
-            const v = data.vars[c.k] || [];
+            const v = r.vars[c.k] || [];
             return v.length > 0 ? `${c.l}: ${v.join(', ')}` : '';
-          }).filter(Boolean).join('\\n');
+          }).filter(Boolean).join('\n');
 
-          const response = await fetch("https://api.anthropic.com/v1/messages", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              model: "claude-sonnet-4-20250514",
-              max_tokens: 2000,
-              messages: [{
-                role: "user",
-                content: `FIELD READING PROTOCOL v2.0
-
-Ear: ${data.ear.toUpperCase()}
-Numbers: ${data.numbers}
-Intensity: ${data.intensity}
+          return `READING ${i + 1}/${unprocessed.length}
+Time: ${new Date(r.time).toLocaleString()}
+Ear: ${r.ear.toUpperCase()}
+Numbers: ${r.numbers}
+Intensity: ${r.intensity}
 
 Variables:
-${varsText}
+${varsText || 'None'}
 
-Internal: ${data.internal || 'Not specified'}
-External: ${data.external || 'Not specified'}
+Internal: ${r.internal || 'Not specified'}
+External: ${r.external || 'Not specified'}
 
-Provide deep synthesis:
-1. Archetypal significance
-2. Quantitative meaning  
-3. Contextual integration
-4. 11-variable resonance
+---`;
+        }).join('\n\n');
 
-Format:
-SYNTHESIS: [analysis]
-VARIABLES: [2-4 from: Joy, Love, Compassion, Coherence, Loyalty, Integrity, Companionship, Fusion, Logic, Abundance, Flow]
-CHECK: [resonance question]`
-              }]
-            })
-          });
+        const header = `FIELD READING BATCH EXPORT
+Total readings: ${unprocessed.length}
+Export time: ${new Date().toLocaleString()}
 
-          const result = await response.json();
-          const text = result.content.filter(i => i.type === "text").map(i => i.text).join("\\n");
+Paste this into Claude with: "Process these field readings through the deep synthesis protocol"
 
-          const synthMatch = text.match(/SYNTHESIS:(.*?)(?=VARIABLES:|$)/s);
-          const varsMatch = text.match(/VARIABLES:(.*?)(?=CHECK:|$)/s);
-          const checkMatch = text.match(/CHECK:(.*?)$/s);
+==========
 
-          const newReading = {
-            id: Date.now(),
-            time: new Date().toISOString(),
-            ear: data.ear,
-            numbers: data.numbers,
-            intensity: data.intensity,
-            vars: data.vars,
-            internal: data.internal,
-            external: data.external,
-            synthesis: synthMatch ? synthMatch[1].trim() : text,
-            autoVars: varsMatch ? varsMatch[1].trim().split(',').map(v => v.trim()).filter(v => vars11.includes(v)) : [],
-            manualVars: [],
-            check: checkMatch ? checkMatch[1].trim() : null,
-            verified: null
-          };
+`;
 
-          save([newReading, ...readings]);
-          
-          setData({ear: '', numbers: '', intensity: 'single', vars: {}, internal: '', external: ''});
-          setStep(1);
-          setView('result');
-          
-        } catch (error) {
-          alert('Error: ' + error.message);
-          setView('capture');
-          setStep(1);
-        } finally {
-          setProcessing(false);
-        }
+        navigator.clipboard.writeText(header + exportText).then(() => {
+          alert(`✓ ${unprocessed.length} readings copied!\n\nNow:\n1. Go to Claude\n2. Paste\n3. Get synthesis\n4. Copy results back`);
+          setShowExport(false);
+        });
       };
 
       const toggleManual = (id, v) => {
         save(readings.map(r => r.id === id ? {...r, manualVars: (r.manualVars || []).includes(v) ? r.manualVars.filter(x => x !== v) : [...(r.manualVars || []), v]} : r));
+      };
+
+      const addSynthesis = (id, text, vars) => {
+        save(readings.map(r => r.id === id ? {...r, synthesis: text, autoVars: vars || []} : r));
       };
 
       const verify = (id, status) => {
@@ -177,7 +168,13 @@ CHECK: [resonance question]`
         setData({ear: '', numbers: '', intensity: 'single', vars: {}, internal: '', external: ''});
       };
 
-      // STEP 1: SIGNAL
+      const deleteReading = (id) => {
+        if (confirm('Delete this reading?')) {
+          save(readings.filter(r => r.id !== id));
+        }
+      };
+
+      // STEP 1
       if (view === 'capture' && step === 1) {
         return (
           <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-indigo-950 text-white p-4">
@@ -247,7 +244,7 @@ CHECK: [resonance question]`
         );
       }
 
-      // STEP 2: VARIABLES
+      // STEP 2
       if (view === 'capture' && step === 2) {
         return (
           <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-indigo-950 text-white p-4">
@@ -257,7 +254,7 @@ CHECK: [resonance question]`
               <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
                 <div className="flex items-center gap-2 mb-4">
                   <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-sm font-bold">2</div>
-                  <h2 className="text-lg font-semibold">Multi-Variable Collection</h2>
+                  <h2 className="text-lg font-semibold">Variables (Optional)</h2>
                 </div>
 
                 <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
@@ -267,7 +264,7 @@ CHECK: [resonance question]`
                       onClick={() => {setActiveVar(c.k); setVarInput('');}}
                       className={`px-3 py-2 rounded-lg whitespace-nowrap text-sm transition ${activeVar === c.k ? 'bg-purple-500' : 'bg-white/5'}`}
                     >
-                      {c.i} {c.l}
+                      {c.i}
                     </button>
                   ))}
                 </div>
@@ -283,7 +280,7 @@ CHECK: [resonance question]`
                         placeholder={c.p}
                         className="flex-1 px-4 py-3 bg-white/5 rounded-xl border border-white/10 focus:outline-none text-sm text-white"
                       />
-                      <button onClick={addVar} className="px-6 py-3 bg-purple-600 rounded-xl hover:bg-purple-700 transition">Add</button>
+                      <button onClick={addVar} className="px-6 py-3 bg-purple-600 rounded-xl">+</button>
                     </div>
 
                     {(data.vars[c.k] || []).length > 0 && (
@@ -291,30 +288,13 @@ CHECK: [resonance question]`
                         {(data.vars[c.k] || []).map((item, i) => (
                           <div key={i} className="px-3 py-1 bg-white/10 rounded-full text-sm flex items-center gap-2">
                             {item}
-                            <button onClick={() => removeVar(c.k, i)} className="text-red-400 hover:text-red-300">×</button>
+                            <button onClick={() => removeVar(c.k, i)} className="text-red-400">×</button>
                           </div>
                         ))}
                       </div>
                     )}
                   </div>
                 ))}
-
-                <div className="mt-6 pt-4 border-t border-white/10">
-                  <p className="text-sm text-white/60 mb-2">Variables collected:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {cats.map(c => {
-                      const count = (data.vars[c.k] || []).length;
-                      return count > 0 ? (
-                        <span key={c.k} className="px-2 py-1 bg-purple-500/20 rounded text-xs">
-                          {c.i} {count}
-                        </span>
-                      ) : null;
-                    })}
-                    {cats.every(c => (data.vars[c.k] || []).length === 0) && (
-                      <span className="text-xs text-white/40">None yet (optional)</span>
-                    )}
-                  </div>
-                </div>
 
                 <button onClick={() => setStep(3)} className="w-full mt-6 py-4 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl font-semibold">
                   Continue to Context →
@@ -325,7 +305,7 @@ CHECK: [resonance question]`
         );
       }
 
-      // STEP 3: CONTEXT
+      // STEP 3
       if (view === 'capture' && step === 3) {
         return (
           <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-indigo-950 text-white p-4">
@@ -335,7 +315,7 @@ CHECK: [resonance question]`
               <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10 space-y-4">
                 <div className="flex items-center gap-2 mb-4">
                   <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-sm font-bold">3</div>
-                  <h2 className="text-lg font-semibold">Context & State</h2>
+                  <h2 className="text-lg font-semibold">Context (Optional)</h2>
                 </div>
 
                 <div>
@@ -343,8 +323,8 @@ CHECK: [resonance question]`
                   <textarea
                     value={data.internal}
                     onChange={(e) => setData({...data, internal: e.target.value})}
-                    placeholder="What were you processing internally?"
-                    rows={4}
+                    placeholder="What were you processing?"
+                    rows={3}
                     className="w-full px-4 py-3 bg-white/5 rounded-xl border border-white/10 focus:outline-none resize-none text-sm text-white"
                   />
                 </div>
@@ -355,126 +335,65 @@ CHECK: [resonance question]`
                     value={data.external}
                     onChange={(e) => setData({...data, external: e.target.value})}
                     placeholder="What was happening around you?"
-                    rows={4}
+                    rows={3}
                     className="w-full px-4 py-3 bg-white/5 rounded-xl border border-white/10 focus:outline-none resize-none text-sm text-white"
                   />
                 </div>
 
                 <button
-                  onClick={submit}
-                  disabled={processing}
-                  className="w-full py-4 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
+                  onClick={saveReading}
+                  className="w-full py-4 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl font-semibold flex items-center justify-center gap-2"
                 >
-                  {processing ? 'Processing Synthesis...' : (
-                    <>
-                      <Sparkles />
-                      Request Pattern Synthesis
-                    </>
-                  )}
+                  💾 Save Reading
                 </button>
+
+                <p className="text-xs text-center text-white/50">Reading saved locally. Export tonight for AI synthesis.</p>
               </div>
             </div>
           </div>
         );
       }
 
-      // RESULT VIEW
-      if (view === 'result') {
-        const r = readings[0];
-        if (!r) return null;
-
-        return (
-          <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-indigo-950 text-white p-4">
-            <div className="max-w-2xl mx-auto">
-              <div className="flex justify-between items-center mb-6">
-                <h1 className="text-xl font-bold flex items-center gap-2">
-                  <Brain />
-                  Synthesis Complete
-                </h1>
-                <button onClick={reset} className="px-4 py-2 bg-purple-600 rounded-xl text-sm">
-                  New Reading
-                </button>
-              </div>
-
-              <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10 space-y-6">
-                <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className={`px-3 py-1 rounded-full text-sm ${r.ear === 'left' ? 'bg-blue-500/30' : 'bg-purple-500/30'}`}>
-                      {r.ear.toUpperCase()}
-                    </span>
-                    <span className="text-2xl font-bold">{r.numbers}</span>
-                  </div>
-                  <p className="text-xs text-white/50">{new Date(r.time).toLocaleString()}</p>
-                </div>
-
-                <div className="bg-black/30 rounded-xl p-4">
-                  <h3 className="text-sm font-semibold mb-3 text-purple-300">SYNTHESIS:</h3>
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{r.synthesis}</p>
-                </div>
-
-                {r.check && (
-                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
-                    <h3 className="text-sm font-semibold mb-2 text-blue-300">RESONANCE CHECK:</h3>
-                    <p className="text-sm text-white/80 mb-3">{r.check}</p>
-                    <div className="grid grid-cols-3 gap-2">
-                      <button onClick={() => {verify(r.id, 'confirmed'); setView('library');}} className="py-2 bg-green-500/20 border border-green-500/50 rounded-lg text-sm">
-                        ✓ Yes
-                      </button>
-                      <button onClick={() => {verify(r.id, 'partial'); setView('library');}} className="py-2 bg-yellow-500/20 border border-yellow-500/50 rounded-lg text-sm">
-                        ≈ Partial
-                      </button>
-                      <button onClick={() => {verify(r.id, 'unconfirmed'); setView('library');}} className="py-2 bg-red-500/20 border border-red-500/50 rounded-lg text-sm">
-                        ✗ No
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <p className="text-xs text-white/50 mb-2">Auto-Detected Variables:</p>
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {r.autoVars.map(v => (
-                      <span key={v} className="px-3 py-1 bg-blue-500/30 rounded-full text-sm">{v}</span>
-                    ))}
-                  </div>
-
-                  <p className="text-xs text-white/50 mb-2">Your Felt Experience:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {vars11.map(v => (
-                      <button
-                        key={v}
-                        onClick={() => toggleManual(r.id, v)}
-                        className={`px-3 py-1 rounded-full text-sm transition ${(r.manualVars || []).includes(v) ? 'bg-purple-500' : 'bg-white/10'}`}
-                      >
-                        {v}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <button onClick={() => setView('library')} className="w-full py-3 bg-white/5 rounded-xl text-sm">
-                  View Library →
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      }
-
-      // LIBRARY VIEW
+      // LIBRARY
       return (
         <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-indigo-950 text-white p-4">
           <div className="max-w-4xl mx-auto">
             <div className="flex justify-between items-center mb-6">
               <h1 className="text-xl font-bold flex items-center gap-2">
                 <TrendingUp />
-                Pattern Library
+                Library
               </h1>
-              <button onClick={reset} className="px-4 py-2 bg-purple-600 rounded-xl flex items-center gap-2">
-                <Plus />
-                New
-              </button>
+              <div className="flex gap-2">
+                <button onClick={() => setShowExport(true)} className="px-3 py-2 bg-green-600/30 rounded flex items-center gap-1 text-sm">
+                  <Download className="w-4 h-4" />
+                  Export
+                </button>
+                <button onClick={reset} className="px-3 py-2 bg-purple-600 rounded flex items-center gap-1 text-sm">
+                  <Plus />
+                  New
+                </button>
+              </div>
             </div>
+
+            {showExport && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                <div className="bg-slate-900 rounded-2xl p-6 max-w-md w-full">
+                  <h2 className="text-lg font-bold mb-4">Export for Synthesis</h2>
+                  <p className="text-sm text-white/70 mb-4">
+                    This will copy {readings.filter(r => !r.synthesis).length} unprocessed readings to clipboard.
+                    Paste into Claude for AI synthesis.
+                  </p>
+                  <div className="flex gap-2">
+                    <button onClick={exportForSynthesis} className="flex-1 py-3 bg-green-600 rounded-xl">
+                      Copy to Clipboard
+                    </button>
+                    <button onClick={() => setShowExport(false)} className="px-6 py-3 bg-white/10 rounded-xl">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-4">
               {readings.map(r => (
@@ -486,41 +405,20 @@ CHECK: [resonance question]`
                           {r.ear.toUpperCase()}
                         </span>
                         <span className="text-xl font-bold">{r.numbers}</span>
+                        {!r.synthesis && <span className="px-2 py-1 bg-yellow-500/20 text-yellow-200 rounded text-xs">Pending Synthesis</span>}
                       </div>
                       <p className="text-xs text-white/50">{new Date(r.time).toLocaleString()}</p>
                     </div>
-                    {r.verified && (
-                      <span className={`px-3 py-1 rounded-full text-xs ${
-                        r.verified === 'confirmed' ? 'bg-green-500/30' :
-                        r.verified === 'partial' ? 'bg-yellow-500/30' : 'bg-red-500/30'
-                      }`}>
-                        {r.verified === 'confirmed' ? '✓ Verified' : r.verified === 'partial' ? '≈ Partial' : '✗ Off'}
-                      </span>
-                    )}
+                    <button onClick={() => deleteReading(r.id)} className="text-red-400 text-xs">Delete</button>
                   </div>
 
                   {r.synthesis && (
                     <div className="bg-black/30 rounded-xl p-4 mb-4">
-                      <p className="text-sm leading-relaxed line-clamp-3">{r.synthesis}</p>
+                      <p className="text-sm leading-relaxed">{r.synthesis}</p>
                     </div>
                   )}
 
-                  <div className="space-y-2">
-                    {r.autoVars && r.autoVars.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {r.autoVars.map(v => (
-                          <span key={v} className="px-2 py-1 bg-blue-500/30 rounded-full text-xs">{v}</span>
-                        ))}
-                      </div>
-                    )}
-                    {r.manualVars && r.manualVars.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {r.manualVars.map(v => (
-                          <span key={v} className="px-2 py-1 bg-purple-500/30 rounded-full text-xs">{v}</span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  {r.internal && <p className="text-xs text-white/60 italic mb-2">"{r.internal}"</p>}
                 </div>
               ))}
 
@@ -535,24 +433,28 @@ CHECK: [resonance question]`
               )}
             </div>
 
-            {readings.length > 0
-              && (
-<div className="mt-8 grid grid-cols-2 gap-4">
-<div className="bg-white/5 rounded-xl p-4 text-center">
-<p className="text-2xl font-bold text-purple-400">{readings.length}</p>
-<p className="text-xs text-white/60">Total Readings</p>
-</div>
-<div className="bg-white/5 rounded-xl p-4 text-center">
-<p className="text-2xl font-bold text-green-400">{readings.filter(r => r.verified === 'confirmed').length}</p>
-<p className="text-xs text-white/60">Verified</p>
-</div>
-</div>
-)}
-</div>
-</div>
-);
-};
+            {readings.length > 0 && (
+              <div className="mt-8 grid grid-cols-3 gap-4">
+                <div className="bg-white/5 rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-purple-400">{readings.length}</p>
+                  <p className="text-xs text-white/60">Total</p>
+                </div>
+                <div className="bg-white/5 rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-yellow-400">{readings.filter(r => !r.synthesis).length}</p>
+                  <p className="text-xs text-white/60">Pending</p>
+                </div>
+                <div className="bg-white/5 rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-green-400">{readings.filter(r => r.synthesis).length}</p>
+                  <p className="text-xs text-white/60">Processed</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    };
+
     ReactDOM.render(<App />, document.getElementById('root'));
-    </script>
+  </script>
 </body>
 </html>
